@@ -1,6 +1,7 @@
 
 /*
  * Copyright (C) Roman Arutyunyan
+ * Extended by Jochen Winzer.
  */
 
 
@@ -9,6 +10,7 @@
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_codec_module.h"
+#include "ngx_rtmp_cc.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
@@ -845,6 +847,17 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
     }
 
+    /* JW: Accept and read CC socket data. */
+    if (cc_sock > 0 && cc_fd < 0)
+    {
+        /* Accept new CC socket connection. */
+        cc_fd = ngx_cc_accept(cc_sock, s->connection->log);
+    }
+    if (cc_fd > 0) {
+        /* Read CC socket data and prepare AMF message. */
+        ngx_cc_read(cc_fd, s);
+    }
+
     /* broadcast to all subscribers */
 
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
@@ -858,12 +871,19 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         /* send metadata */
 
         if (meta && meta_version != pctx->meta_version) {
-            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
-                           "live: meta");
+            ngx_log_error_core(NGX_LOG_INFO, ss->connection->log, 0,
+                               "live: meta");
 
             if (ngx_rtmp_send_message(ss, meta, 0) == NGX_OK) {
                 pctx->meta_version = meta_version;
             }
+        }
+
+        /* JW: Send CC data if available. */
+        if (codec_ctx->ccdat != NULL) {
+            ngx_log_error_core(NGX_LOG_INFO, ss->connection->log, 0,
+                               "live: CC data");
+            ngx_rtmp_send_message(ss, codec_ctx->ccdat, 0);
         }
 
         /* sync stream */
@@ -1007,6 +1027,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         cs->timestamp += delta;
         ++peers;
         ss->current_time = cs->timestamp;
+    }
+
+    /* JW: Release CC data buffers. */
+    if (codec_ctx->ccdat) {
+        ngx_rtmp_free_shared_chain(cscf, codec_ctx->ccdat);
+        codec_ctx->ccdat = NULL;
     }
 
     if (rpkt) {

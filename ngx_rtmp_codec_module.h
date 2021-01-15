@@ -1,6 +1,7 @@
 
 /*
  * Copyright (C) Roman Arutyunyan
+ * Extended by Jochen Winzer.
  */
 
 
@@ -78,6 +79,7 @@ typedef struct {
 
     ngx_chain_t                *meta;
     ngx_uint_t                  meta_version;
+    ngx_chain_t                *ccdat; /* JW */
 } ngx_rtmp_codec_ctx_t;
 
 

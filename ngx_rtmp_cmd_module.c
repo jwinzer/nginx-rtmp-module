@@ -1,6 +1,7 @@
 
 /*
  * Copyright (C) Roman Arutyunyan
+ * Extended by Jochen Winzer.
  */
 
 
@@ -8,6 +9,7 @@
 #include <ngx_core.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_streams.h"
+#include "ngx_rtmp_cc.h"
 
 
 #define NGX_RTMP_FMS_VERSION        "FMS/3,0,1,123"
@@ -505,6 +507,9 @@ ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "publish: name='%s' args='%s' type=%s silent=%d",
                   v.name, v.args, v.type, v.silent);
+
+    /* JW: Reset CC socket connection whenever a connection is published. */
+    cc_fd = -1;
 
     return ngx_rtmp_publish(s, &v);
 }
